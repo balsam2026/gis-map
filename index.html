@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -108,6 +108,23 @@
         .system-toggle button.active {
             background-color: var(--accent-color);
             color: #000;
+        }
+
+        .toggle-option {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .toggle-option input[type="checkbox"] {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent-color);
         }
 
         .btn-group {
@@ -331,6 +348,11 @@
             </div>
 
             <button id="addPointBtn">إضافة نقطة</button>
+
+            <label class="toggle-option">
+                <input type="checkbox" id="measureToggle" checked>
+                <span>تفعيل قياس المسافة</span>
+            </label>
         </div>
 
         <div class="btn-group">
@@ -341,7 +363,7 @@
 
     <main class="workspace">
         <aside class="sidebar">
-            <section class="stats-panel">
+            <section class="stats-panel" id="statsPanel">
                 <div class="stat-card">
                     <div class="stat-label">المسافة الإجمالية (كيلومتر)</div>
                     <div class="stat-value" id="distKm">0.000 km</div>
@@ -376,10 +398,11 @@
 
         // Central State Management Matrix
         let appState = {
-            points: [],       // Array of {lat, lng} objects
-            markers: [],      // Array of Leaflet marker instances
-            polyline: null,   // Leaflet polyline instance
-            inputMode: 'WGS'  // Current input system mode: 'WGS' or 'UTM'
+            points: [],            // Array of {lat, lng} objects
+            markers: [],           // Array of Leaflet marker instances
+            polyline: null,        // Leaflet polyline instance
+            inputMode: 'WGS',      // Current input system mode: 'WGS' or 'UTM'
+            enableDistance: true   // Distance measurement state
         };
 
         // Initialize Map Control
@@ -434,6 +457,7 @@
 
         // Calculate total distance along all collected points
         function calculateTotalDistance() {
+            if (!appState.enableDistance) return 0;
             let totalMeters = 0;
             for (let i = 0; i < appState.points.length - 1; i++) {
                 const p1 = appState.points[i];
@@ -475,8 +499,8 @@
                 appState.markers.push(marker);
             });
 
-            // Draw Vector Polyline
-            if (appState.points.length > 1) {
+            // Draw Vector Polyline only if measurement is active
+            if (appState.enableDistance && appState.points.length > 1) {
                 const latLngArray = appState.points.map(p => [p.lat, p.lng]);
                 appState.polyline = L.polyline(latLngArray, {
                     color: '#38bdf8',
@@ -485,13 +509,18 @@
                 }).addTo(map);
             }
 
-            // Calculate Metrics
-            const totalMeters = calculateTotalDistance();
-            const totalKm = totalMeters / 1000;
+            // Handle UI display state for measurement panel
+            const statsPanel = document.getElementById('statsPanel');
+            if (appState.enableDistance) {
+                statsPanel.style.display = 'block';
+                const totalMeters = calculateTotalDistance();
+                const totalKm = totalMeters / 1000;
+                document.getElementById('distM').textContent = totalMeters.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' m';
+                document.getElementById('distKm').textContent = totalKm.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' km';
+            } else {
+                statsPanel.style.display = 'none';
+            }
 
-            // Render Metrics
-            document.getElementById('distM').textContent = totalMeters.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' m';
-            document.getElementById('distKm').textContent = totalKm.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' km';
             document.getElementById('pointCount').textContent = appState.points.length;
 
             // Render Points List
@@ -561,6 +590,12 @@
             document.getElementById('modeWgsBtn').classList.remove('active');
             document.getElementById('wgsInputs').style.display = 'none';
             document.getElementById('utmInputs').style.display = 'flex';
+        });
+
+        // Toggle Distance Measurement Logic
+        document.getElementById('measureToggle').addEventListener('change', function() {
+            appState.enableDistance = this.checked;
+            updateStateAndUI();
         });
 
         // Event Listeners
